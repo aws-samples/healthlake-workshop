@@ -12,7 +12,7 @@ Resources:
     Properties: 
       CodeRepositoryName: healthlake-workshop
       GitConfig:
-        RepositoryUrl:  [URL for Healthlake workshop code]
+        RepositoryUrl: https://github.com/aws-samples/healthlake-workshop
   BasicNotebookInstanceLifecycleConfig:
     Type: "AWS::SageMaker::NotebookInstanceLifecycleConfig"
     Properties:
