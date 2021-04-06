@@ -1,0 +1,36 @@
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: MIT-0
+
+create table parseddocref_patient_encounter as 
+SELECT distinct p.name[1].family as patient_name, p.id as patient_id,
+      enc.period.start as start_enc, enc.period.start as end_enc,
+      enc.type[1].text as encounter_type, pdr.code_description as parsed_condition,
+      pdr.code_score, pdr.entity_score
+FROM  healthlakedb.patient p 
+FULL OUTER JOIN healthlakedb.encounter enc   
+ON ("split"("enc"."subject"."reference", '/')[2] = "p"."id")
+FULL OUTER JOIN healthlakedb.parseddocref pdr
+ON ("split"("pdr"."encounter_id", '/')[2] = "enc"."id")
+
+
+create table healthlakedb.condition_patient_encounter as
+SELECT DISTINCT p.name[1].family AS patient_name,
+         p.id as patient_id,
+         p.gender,
+         cast (p.birthdate AS date) AS birthdate,
+         p.maritalstatus.text as maritalstatus,
+         p.deceaseddatetime as deceaseddatetime,
+         enc.id as encounter_id,
+         enc.period.start  AS start_enc,
+         enc.period."end" AS "end_enc",
+         enc.type[1].coding[1].display as encounter_type,
+         cond.clinicalstatus.coding[1].code as clinicalstatus,
+         cond.category[1].coding[1].display as category,
+         cond.code.coding[1].display as condition
+FROM healthlakedb.patient p 
+FULL OUTER JOIN healthlakedb.encounter enc
+    ON ("split"("enc"."subject"."reference", '/')[2] = "p"."id")
+FULL OUTER JOIN healthlakedb.condition cond
+    ON ("split"("cond"."encounter"."reference", '/')[2] = "enc"."id")
+	
+	

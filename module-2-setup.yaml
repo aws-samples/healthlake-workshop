@@ -1,0 +1,173 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  This template sets up Glue resources and Athena tables to run queries over HealthLake exported data.
+
+Parameters:
+  CrawlerName:
+    Type: String
+    Default: "healthlake-export-crawler"
+    Description: "Name of Glue crawler to crawl over HealthLake exported data"
+
+  HealthLakeExportS3Bucket:
+    Type: String
+    Default: "bucket-name"
+    Description: "S3 bucket where HealthLake data has been exported"
+
+  HealthLakeExportS3Prefix:
+    Type: String
+    Default: "prefix"
+    Description: "S3 prefix where HealthLake data has been exported without ending slash"
+
+  DBName:
+    Type: String
+    Default: "healthlakedb"
+    Description: "Database name"
+
+  GlueDocRefParserJobName:
+    Type: String
+    Default: "DocRefParserJob"
+    Description: "Glue job name to parse DocumentReference resource"
+
+Resources:
+  HealthLakeDatabase:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: !Ref DBName
+        Description: "AWS Glue container to hold metadata tables for the HealthLake exported data crawler"
+  HealthLakeCrawler:
+    Type: AWS::Glue::Crawler
+    Properties:
+      Name: !Ref CrawlerName
+      Role: !GetAtt HealthLakeGlueRole.Arn
+      Description: AWS Glue crawler to crawl HealthLake data
+      DatabaseName: !Ref DBName
+      Targets:
+        S3Targets:
+          - Path: !Sub "s3://${HealthLakeExportS3Bucket}/${HealthLakeExportS3Prefix}/"
+      SchemaChangePolicy:
+        UpdateBehavior: "UPDATE_IN_DATABASE"
+        DeleteBehavior: "LOG"
+      Configuration: "{\"Version\":1.0,\"CrawlerOutput\":{\"Partitions\":{\"AddOrUpdateBehavior\":\"InheritFromTable\"},\"Tables\":{\"AddOrUpdateBehavior\":\"MergeNewColumns\"}}}"
+  DocRefCrawler:
+    Type: AWS::Glue::Crawler
+    Properties:
+      Name: DocRefCrawler
+      Role: !GetAtt HealthLakeGlueRole.Arn
+      Description: AWS Glue crawler to crawl parsed Document Reference data
+      DatabaseName: !Ref DBName
+      Targets:
+        S3Targets:
+          - Path: !Sub "s3://${HealthLakeExportS3Bucket}/ParsedDocRef/"
+      SchemaChangePolicy:
+        UpdateBehavior: "UPDATE_IN_DATABASE"
+        DeleteBehavior: "LOG"
+      Configuration: "{\"Version\":1.0,\"CrawlerOutput\":{\"Partitions\":{\"AddOrUpdateBehavior\":\"InheritFromTable\"},\"Tables\":{\"AddOrUpdateBehavior\":\"MergeNewColumns\"}}}"
+  HealthLakeGlueRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: "healthlake-workshop-glue-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "glue.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: "/"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole
+      Policies:
+        - PolicyName: "healthlake-workshop-glue-policy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "cloudwatch:PutMetricData"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                  - "logs:CreateLogGroup"
+                  - "logs:DescribeLogStreams"
+                Resource: "*"
+              - Effect: "Allow"
+                Action:
+                  - "cloudwatch:PutMetricData"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                  - "logs:CreateLogGroup"
+                  - "logs:DescribeLogStreams"
+                Resource: "*"
+              - Effect: "Allow"
+                Action:
+                  - "s3:GetObject"
+                  - "s3:PutObject"
+                  - "s3:ListBucket"
+                Resource:
+                  - !Sub "arn:aws:s3:::${HealthLakeExportS3Bucket}"
+                  - !Sub "arn:aws:s3:::${HealthLakeExportS3Bucket}/*"
+  HealthLakeDocRefJob:
+    Type: AWS::Glue::Job
+    Properties:
+      Role: !Ref HealthLakeGlueRole
+      Description: Glue job to parse DocumentReference resource
+      Command:
+        Name: pythonshell
+        PythonVersion: 3
+        ScriptLocation: !Sub "s3://${HealthLakeExportS3Bucket}/DocRefParser.py"
+      DefaultArguments:
+        "--bucket": !Ref HealthLakeExportS3Bucket
+        "--prefix": !Sub "${HealthLakeExportS3Prefix}/DocumentReference/"
+      MaxCapacity: 1
+      Name: !Ref GlueDocRefParserJobName
+  HealthLakeDocRefJobTrigger:
+    Type: AWS::Glue::Trigger
+    Properties:
+      Type: CONDITIONAL
+      Description: Glue job trigger
+      WorkflowName: !Ref HealthLakeGlueWorkflow
+      StartOnCreation: True
+      Actions:
+        - JobName: !Ref HealthLakeDocRefJob
+      Predicate:
+        Conditions:
+          - LogicalOperator: EQUALS
+            CrawlerName: !Ref HealthLakeCrawler
+            CrawlState: SUCCEEDED
+        Logical: ANY
+      Name: HealthLakeDocRefJobTrigger
+  HealthLakeGlueWorkflow:
+    Type: AWS::Glue::Workflow
+    Properties:
+      Name: Glue-Athena-Workflow
+      Description: Workflow for orchestrating crawling HealthLake data and parsing DocumentReference resource.
+  CrawlerTrigger:
+    Type: AWS::Glue::Trigger
+    Properties:
+      WorkflowName: !Ref HealthLakeGlueWorkflow
+      Name: healthlake-trigger
+      Description: Start crawler for exported HealthLake data
+      Type: ON_DEMAND
+      Actions:
+        - CrawlerName: !Ref HealthLakeCrawler
+#  HealthLakeParsedDocRefCrawlerTrigger:
+#    Type: AWS::Glue::Trigger
+#    Properties:
+#      Type: ON_DEMAND
+#      Description: Crawler job trigger
+#      WorkflowName: !Ref HealthLakeGlueWorkflow
+#      Actions:
+#        - JobName: !Ref DocRefCrawler
+#      Predicate:
+#        Conditions:
+#          - LogicalOperator: EQUALS
+#            CrawlerName: !Ref HealthLakeDocRefJob
+#            CrawlState: SUCCEEDED
+#        Logical: ANY
+#      Name: HealthLakeParsedDocRefCrawlerTrigger
