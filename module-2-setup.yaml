@@ -140,12 +140,11 @@ Resources:
           - LogicalOperator: EQUALS
             CrawlerName: !Ref HealthLakeCrawler
             CrawlState: SUCCEEDED
-        Logical: ANY
       Name: HealthLakeDocRefJobTrigger
   HealthLakeGlueWorkflow:
     Type: AWS::Glue::Workflow
     Properties:
-      Name: Glue-Athena-Workflow
+      Name: healthlake-post-export
       Description: Workflow for orchestrating crawling HealthLake data and parsing DocumentReference resource.
   CrawlerTrigger:
     Type: AWS::Glue::Trigger
@@ -156,18 +155,4 @@ Resources:
       Type: ON_DEMAND
       Actions:
         - CrawlerName: !Ref HealthLakeCrawler
-#  HealthLakeParsedDocRefCrawlerTrigger:
-#    Type: AWS::Glue::Trigger
-#    Properties:
-#      Type: ON_DEMAND
-#      Description: Crawler job trigger
-#      WorkflowName: !Ref HealthLakeGlueWorkflow
-#      Actions:
-#        - JobName: !Ref DocRefCrawler
-#      Predicate:
-#        Conditions:
-#          - LogicalOperator: EQUALS
-#            CrawlerName: !Ref HealthLakeDocRefJob
-#            CrawlState: SUCCEEDED
-#        Logical: ANY
-#      Name: HealthLakeParsedDocRefCrawlerTrigger
+ 

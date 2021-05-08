@@ -51,6 +51,7 @@ for file in files:
             data = json.loads(line)
             record_id = data['id']
             patient_id = data['subject']['reference']
+            encounter_id = data['context']['encounter'][0]['reference']
 
             ## get the top-level FHIR extension element
             data = data['extension']
@@ -114,6 +115,7 @@ for file in files:
                                 output.append({
                                     'row_id': row_id,
                                     'record_id': record_id,
+                                    'encounter_id': encounter_id,
                                     'patient_id': patient_id,
                                     'entity_id': entity_id,
                                     'entity_score': entity_score,
