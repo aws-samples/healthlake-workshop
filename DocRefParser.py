@@ -54,7 +54,10 @@ for file in files:
             encounter_id = data['context']['encounter'][0]['reference']
 
             ## get the top-level FHIR extension element
-            data = data['extension']
+            try:
+                data = data['extension']
+            except KeyError:
+                continue
 
             for item in data:
                 if item['url'] == 'http://healthlake.amazonaws.com/aws-cm/':
