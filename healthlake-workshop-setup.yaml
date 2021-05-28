@@ -3,6 +3,8 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Sub 'ac${AWS::AccountId}-healthlake-workshop'
+      VersioningConfiguration:
+        Status: Enabled
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
