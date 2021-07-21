@@ -2,7 +2,7 @@ Resources:
   workshopS3Bucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub 'ac${AWS::AccountId}-healthlake-workshop'
+      BucketName: !Sub "ac${AWS::AccountId}-healthlake-workshop"
       VersioningConfiguration:
         Status: Enabled
       PublicAccessBlockConfiguration:
@@ -13,10 +13,10 @@ Resources:
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
-              SSEAlgorithm: AES256     
+              SSEAlgorithm: AES256
   defaultRepository:
     Type: AWS::SageMaker::CodeRepository
-    Properties: 
+    Properties:
       CodeRepositoryName: healthlake-workshop
       GitConfig:
         RepositoryUrl: https://github.com/aws-samples/healthlake-workshop
@@ -79,18 +79,39 @@ Resources:
                   - "logs:DescribeLogStreams"
                 Resource: "*"
               - Effect: "Allow"
-                Action: 
+                Action:
                   - "s3:GetObject"
                   - "s3:PutObject"
                   - "s3:ListBucket"
-                Resource: 
-                  - !Sub 'arn:aws:s3:::${workshopS3Bucket}'
-                  - !Sub 'arn:aws:s3:::${workshopS3Bucket}/*'
+                Resource:
+                  - !Sub "arn:aws:s3:::${workshopS3Bucket}"
+                  - !Sub "arn:aws:s3:::${workshopS3Bucket}/*"
+
+  s3ImportExportLogsKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: KMS CMK to use in Import and Export API to encrypt logs
+      KeyPolicy:
+        Version: "2012-10-17"
+        Id: key-default-1
+        Statement:
+          - Sid: Enable IAM User Permissions
+            Effect: Allow
+            Principal:
+              AWS:
+                Fn::Join:
+                  - ""
+                  - - "arn:aws:iam::"
+                    - Ref: AWS::AccountId
+                    - :root
+            Action: kms:*
+            Resource: "*"
+
   workshopNotebook:
     Type: AWS::SageMaker::NotebookInstance
-    Properties: 
-      AdditionalCodeRepositories: 
-      - https://github.com/synthetichealth/synthea.git
+    Properties:
+      AdditionalCodeRepositories:
+        - https://github.com/synthetichealth/synthea.git
       DefaultCodeRepository: !GetAtt defaultRepository.CodeRepositoryName
       DirectInternetAccess: Enabled
       InstanceType: ml.t3.medium
@@ -105,3 +126,6 @@ Outputs:
   SageMakerNotebook:
     Description: SageMaker notebook Instance
     Value: !Ref workshopNotebook
+  KMSImportExportLogsKey:
+    Description: KMS CMK to use in Import and Export API to encrypt logs
+    Value: !Ref s3ImportExportLogsKey
