@@ -52,7 +52,7 @@ Resources:
       SchemaChangePolicy:
         UpdateBehavior: "UPDATE_IN_DATABASE"
         DeleteBehavior: "LOG"
-      Configuration: "{\"Version\":1.0,\"CrawlerOutput\":{\"Partitions\":{\"AddOrUpdateBehavior\":\"InheritFromTable\"},\"Tables\":{\"AddOrUpdateBehavior\":\"MergeNewColumns\"}}}"
+      Configuration: '{"Version":1.0,"CrawlerOutput":{"Partitions":{"AddOrUpdateBehavior":"InheritFromTable"},"Tables":{"AddOrUpdateBehavior":"MergeNewColumns"}}}'
   DocRefCrawler:
     Type: AWS::Glue::Crawler
     Properties:
@@ -66,7 +66,7 @@ Resources:
       SchemaChangePolicy:
         UpdateBehavior: "UPDATE_IN_DATABASE"
         DeleteBehavior: "LOG"
-      Configuration: "{\"Version\":1.0,\"CrawlerOutput\":{\"Partitions\":{\"AddOrUpdateBehavior\":\"InheritFromTable\"},\"Tables\":{\"AddOrUpdateBehavior\":\"MergeNewColumns\"}}}"
+      Configuration: '{"Version":1.0,"CrawlerOutput":{"Partitions":{"AddOrUpdateBehavior":"InheritFromTable"},"Tables":{"AddOrUpdateBehavior":"MergeNewColumns"}}}'
   HealthLakeGlueRole:
     Type: "AWS::IAM::Role"
     Properties:
@@ -98,20 +98,18 @@ Resources:
                 Resource: "*"
               - Effect: "Allow"
                 Action:
-                  - "cloudwatch:PutMetricData"
-                  - "logs:CreateLogStream"
-                  - "logs:PutLogEvents"
-                  - "logs:CreateLogGroup"
-                  - "logs:DescribeLogStreams"
-                Resource: "*"
-              - Effect: "Allow"
-                Action:
                   - "s3:GetObject"
                   - "s3:PutObject"
                   - "s3:ListBucket"
                 Resource:
                   - !Sub "arn:aws:s3:::${HealthLakeExportS3Bucket}"
                   - !Sub "arn:aws:s3:::${HealthLakeExportS3Bucket}/*"
+              - Effect: "Allow"
+                Action:
+                  - "kms:Decrypt"
+                Resource:
+                  - !Sub "arn:aws:kms:*:${AWS::AccountId}:key/*"
+
   HealthLakeDocRefJob:
     Type: AWS::Glue::Job
     Properties:
@@ -119,7 +117,7 @@ Resources:
       Description: Glue job to parse DocumentReference resource
       Command:
         Name: pythonshell
-        PythonVersion: 3
+        PythonVersion: "3"
         ScriptLocation: !Sub "s3://${HealthLakeExportS3Bucket}/DocRefParser.py"
       DefaultArguments:
         "--bucket": !Ref HealthLakeExportS3Bucket
@@ -155,4 +153,3 @@ Resources:
       Type: ON_DEMAND
       Actions:
         - CrawlerName: !Ref HealthLakeCrawler
- 
