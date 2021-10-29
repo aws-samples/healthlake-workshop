@@ -1,4 +1,5 @@
 Resources:
+
   workshopS3Bucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -14,43 +15,140 @@ Resources:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
+
   defaultRepository:
     Type: AWS::SageMaker::CodeRepository
     Properties:
       CodeRepositoryName: healthlake-workshop
       GitConfig:
         RepositoryUrl: https://github.com/aws-samples/healthlake-workshop
+
   BasicNotebookInstanceLifecycleConfig:
     Type: "AWS::SageMaker::NotebookInstanceLifecycleConfig"
     Properties:
       NotebookInstanceLifecycleConfigName: stopidle
       OnStart:
         - Content:
-            Fn::Base64: |
-              #!/bin/bash
+            Fn::Base64: !Join
+              - '\n'
+              - - |
+                  #!/bin/bash
 
-              set -e
+                  set -e
+                - !Sub |
 
-              # OVERVIEW
-              # This script stops a SageMaker notebook once it's idle for more than 1 hour (default time)
-              # You can change the idle time for stop using the environment variable below.
-              # If you want the notebook the stop only if no browsers are open, remove the --ignore-connections flag
-              #
-              # Note that this script will fail if either condition is not met
-              #   1. Ensure the Notebook Instance has internet connectivity to fetch the example config
-              #   2. Ensure the Notebook Instance execution role permissions to SageMaker:StopNotebookInstance to stop the notebook
-              #       and SageMaker:DescribeNotebookInstance to describe the notebook.
-              #
+                  echo "export WORKSHOP_S3_BUCKET=${WorkshopS3Bucket}" > /etc/profile.d/scoschre-notebook-environment.sh
+                - |
+                  # OVERVIEW
+                  # This script stops a SageMaker notebook once it's idle for more than 1 hour (default time)
+                  # You can change the idle time for stop using the environment variable below.
+                  # If you want the notebook the stop only if no browsers are open, remove the --ignore-connections flag
+                  #
+                  # Note that this script will fail if either condition is not met
+                  #   1. Ensure the Notebook Instance has internet connectivity to fetch the example config
+                  #   2. Ensure the Notebook Instance execution role permissions to SageMaker:StopNotebookInstance to stop the notebook
+                  #       and SageMaker:DescribeNotebookInstance to describe the notebook.
+                  #
 
-              # PARAMETERS
-              IDLE_TIME=3600
+                  # PARAMETERS
+                  IDLE_TIME=3600
 
-              echo "Fetching the autostop script"
-              wget https://raw.githubusercontent.com/aws-samples/amazon-sagemaker-notebook-instance-lifecycle-config-samples/master/scripts/auto-stop-idle/autostop.py
+                  echo "Fetching the autostop script"
+                  wget https://raw.githubusercontent.com/aws-samples/amazon-sagemaker-notebook-instance-lifecycle-config-samples/master/scripts/auto-stop-idle/autostop.py
 
-              echo "Starting the SageMaker autostop script in cron"
+                  echo "Starting the SageMaker autostop script in cron"
 
-              (crontab -l 2>/dev/null; echo "*/5 * * * * /usr/bin/python $PWD/autostop.py --time $IDLE_TIME --ignore-connections") | crontab -
+                  (crontab -l 2>/dev/null; echo "*/5 * * * * /usr/bin/python $PWD/autostop.py --time $IDLE_TIME --ignore-connections") | crontab -
+
+  HealthLakeImportRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: "AmazonHealthLake-Import-healthlake-workshop"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "healthlake.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: "/"
+      Policies:
+        - PolicyName: "healthlake-workshop-import-policy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "s3:GetObject"
+                Resource:
+                  - !Sub "arn:aws:s3:::${workshopS3Bucket}/import/*"
+              - Effect: "Allow"
+                Action:
+                  - "s3:ListBucket"
+                  - "s3:GetBucketPublicAccessBlock"
+                  - "s3:GetEncryptionConfiguration"
+                Resource:
+                  - !Sub "arn:aws:s3:::${workshopS3Bucket}"
+              - Effect: "Allow"
+                Action:
+                  - "s3:PutObject"
+                Resource:
+                  - !Sub "arn:aws:s3:::${workshopS3Bucket}/logs/*"
+              - Effect: "Allow"
+                Action:
+                  - "kms:DescribeKey"
+                  - "kms:GenerateDataKey*"
+                  - "kms:Encrypt"
+                  - "kms:ReEncrypt*"
+                  - "kms:Decrypt"
+                Resource:
+                  - !GetAtt s3ImportExportLogsKey.Arn
+
+  HealthLakeExportRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: "AmazonHealthLake-Export-healthlake-workshop"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "healthlake.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: "/"
+      Policies:
+        - PolicyName: "healthlake-workshop-export-policy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "s3:ListBucket"
+                  - "s3:GetBucketPublicAccessBlock"
+                  - "s3:GetEncryptionConfiguration"
+                Resource:
+                  - !Sub "arn:aws:s3:::${workshopS3Bucket}"
+              - Effect: "Allow"
+                Action:
+                  - "s3:PutObject"
+                Resource:
+                  - !Sub "arn:aws:s3:::${workshopS3Bucket}/export/*"
+              - Effect: "Allow"
+                Action:
+                  - "kms:DescribeKey"
+                  - "kms:GenerateDataKey*"
+                  - "kms:Encrypt"
+                  - "kms:ReEncrypt*"
+                  - "kms:Decrypt"
+                Resource:
+                  - !GetAtt s3ImportExportLogsKey.Arn
+
+
+
   ExecutionRole:
     Type: "AWS::IAM::Role"
     Properties:
@@ -62,6 +160,12 @@ Resources:
             Principal:
               Service:
                 - "sagemaker.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "healthlake.amazonaws.com"
             Action:
               - "sts:AssumeRole"
       Path: "/"
@@ -86,6 +190,16 @@ Resources:
                 Resource:
                   - !Sub "arn:aws:s3:::${workshopS3Bucket}"
                   - !Sub "arn:aws:s3:::${workshopS3Bucket}/*"
+              - Effect: "Allow"
+                Action:
+                  - "healthlake:DescribeFHIRDatastore"
+                  - "healthlake:ListFHIRDatastores"
+                  - "healthlake:DescribeFHIRImportJob"
+                  - "healthlake:ListFHIRImportJobs"
+                  - "healthlake:DescribeFHIRExportJob"
+                  - "healthlake:ListFHIRExportJobs"
+                Resource:
+                  - "arn:aws:healthlake:*:*:datastore/fhir/*"
 
   s3ImportExportLogsKey:
     Type: AWS::KMS::Key
@@ -119,7 +233,20 @@ Resources:
       RoleArn: !GetAtt ExecutionRole.Arn
       VolumeSizeInGB: 10
       LifecycleConfigName: !GetAtt BasicNotebookInstanceLifecycleConfig.NotebookInstanceLifecycleConfigName
+
+  workshopDatastore:
+    Type: AWS::HealthLake::FHIRDatastore
+    Properties:
+      DatastoreName: "healthlake-workshop"
+      DatastoreTypeVersion: "R4"
+      SseConfiguration:
+        KmsEncryptionConfig:
+          CmkType: "AWS_OWNED_KMS_KEY"
+
 Outputs:
+  FHIRDatastore:
+    Description: The Amazon HealthLake FHIR Datastore for the workshop
+    Value: !Ref workshopDatastore
   S3DataBucket:
     Description: S3 bucket to store FHIR resources for import and export
     Value: !Ref workshopS3Bucket
