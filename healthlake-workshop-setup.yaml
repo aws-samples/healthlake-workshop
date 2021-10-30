@@ -37,8 +37,8 @@ Resources:
                   set -e
                 - !Sub |
 
-                  echo "export WORKSHOP_S3_BUCKET=${workshopS3Bucket}" > /etc/profile.d/scoschre-notebook-environment.sh
-                  echo "export WORKSHOP_DATASTORE=${workshopDatastore}" >> /etc/profile.d/scoschre-notebook-environment.sh
+                  echo "export WORKSHOP_S3_BUCKET=${workshopS3Bucket}" > /etc/profile.d/healthlake-workshop-environment.sh
+                  echo "export WORKSHOP_DATASTORE=${workshopDatastore}" >> /etc/profile.d/healthlake-workshop-environment.sh
                 - |
                   # OVERVIEW
                   # This script stops a SageMaker notebook once it's idle for more than 1 hour (default time)
