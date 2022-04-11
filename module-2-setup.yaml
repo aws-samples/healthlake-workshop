@@ -31,6 +31,31 @@ Parameters:
     Default: "DocRefParserJob"
     Description: "Glue job name to parse DocumentReference resource"
 
+  HealthLakeGlueRoleName:
+    Type: String
+    Default: "healthlake-workshop-glue-role"
+    Description: "Glue Role"
+
+  CrawlerTriggerName:
+    Type: String
+    Default: "healthlake-trigger"
+    Description: "Crawler Trigger"
+
+  DocRefCrawlerName:
+    Type: String
+    Default: "DocRefCrawler"
+    Description: "DocRefCrawler name"
+
+  HealthLakeGlueWorkflowName:
+    Type: String
+    Default: "healthlake-post-export"
+    Description: "HealthLakeGlueWorkflow name"
+
+  HealthLakeDocRefJobTriggerName:
+    Type: String
+    Default: "HealthLakeDocRefJobTrigger"
+    Description: "HealthLakeDocRefJobTrigger name"
+
 Resources:
   HealthLakeDatabase:
     Type: AWS::Glue::Database
@@ -56,7 +81,7 @@ Resources:
   DocRefCrawler:
     Type: AWS::Glue::Crawler
     Properties:
-      Name: DocRefCrawler
+      Name: !Ref DocRefCrawlerName
       Role: !GetAtt HealthLakeGlueRole.Arn
       Description: AWS Glue crawler to crawl parsed Document Reference data
       DatabaseName: !Ref DBName
@@ -70,7 +95,7 @@ Resources:
   HealthLakeGlueRole:
     Type: "AWS::IAM::Role"
     Properties:
-      RoleName: "healthlake-workshop-glue-role"
+      RoleName: !Ref HealthLakeGlueRoleName
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -138,17 +163,17 @@ Resources:
           - LogicalOperator: EQUALS
             CrawlerName: !Ref HealthLakeCrawler
             CrawlState: SUCCEEDED
-      Name: HealthLakeDocRefJobTrigger
+      Name: !Ref HealthLakeDocRefJobTriggerName
   HealthLakeGlueWorkflow:
     Type: AWS::Glue::Workflow
     Properties:
-      Name: healthlake-post-export
+      Name: !Ref HealthLakeGlueWorkflowName
       Description: Workflow for orchestrating crawling HealthLake data and parsing DocumentReference resource.
   CrawlerTrigger:
     Type: AWS::Glue::Trigger
     Properties:
       WorkflowName: !Ref HealthLakeGlueWorkflow
-      Name: healthlake-trigger
+      Name: !Ref CrawlerTriggerName
       Description: Start crawler for exported HealthLake data
       Type: ON_DEMAND
       Actions:
