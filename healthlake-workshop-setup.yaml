@@ -1,5 +1,4 @@
 Resources:
-
   workshopS3Bucket:
     Type: AWS::S3::Bucket
     Properties:
